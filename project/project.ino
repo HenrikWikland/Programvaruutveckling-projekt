@@ -11,6 +11,8 @@
 #include <TFT_eSPI.h>
 #include <time.h>
 
+void menu();
+void settings();
 
 // Remember to remove these before commiting in GitHub
 String ssid = "ssid";
@@ -72,9 +74,104 @@ void loop() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
-  tft.drawString("Hello student", 10, 10);
+  tft.drawString("Verion: 1.0.0", 10, 10);
+  tft.drawString("Group 10", 10, 40);
   
-  delay(1000);
+  delay(3000);
+  menu();
+}
+
+/**
+ * Starting Menu
+ */
+void menu() {
+  bool menu = true;
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextSize(1);
+  tft.drawString("Start Screen", 10, 10);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.fillRect(250, 0, 70, 25, TFT_WHITE);
+  tft.drawString("Settings", 260, 10);
+  delay(500);
+  while(menu){
+    int sensorVal = digitalRead(PIN_BUTTON_2);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    if (sensorVal == 0){
+      settings(0);
+    } 
+  }
+}
+
+/**
+ * Settings screen. Lets the user scroll through their different options and select one of them.
+ */
+void settings(int selectedOption){
+  tft.fillScreen(TFT_BLACK);
+  int min = 0;
+  int max = 1;
+  String options[max+1] = {"Exit Settings", "Select City"};
+  tft.setTextSize(1);
+  tft.drawString("Settings", 10, 10);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.fillRect(250, 0, 70, 25, TFT_WHITE);
+  tft.drawString("Select", 260, 10);
+  tft.fillRect(250, 145, 70, 25, TFT_WHITE);
+  tft.drawString("Down", 260, 155);
+  tft.setTextSize(3);
+  if (selectedOption == min){
+    String exit = "Exit Settings";
+    tft.drawString(options[selectedOption], 40, 80);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString(options[selectedOption+1], 40, 110);
+    tft.drawString(options[max], 40, 60);
+  } else if (selectedOption == max){
+    tft.drawString(options[selectedOption], 40, 80);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(2);
+    tft.drawString(options[min], 40, 110);
+    tft.drawString(options[selectedOption-1], 40, 60);
+  } else {
+    tft.drawString(options[selectedOption], 40, 80);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(2);
+    tft.drawString(options[selectedOption+1], 40, 110);
+    tft.drawString(options[selectedOption-1], 40, 60);
+  }
+  delay(500);
+  while(true){
+    int sensorVal1 = digitalRead(PIN_BUTTON_1);
+    int sensorVal2 = digitalRead(PIN_BUTTON_2);
+    if (sensorVal1 == 0){
+      if (selectedOption == max){
+        settings(0);
+      } else {
+        settings(selectedOption + 1);
+      }
+    } else if (sensorVal2 == 0){
+      if (selectedOption == 0){
+        menu();
+      } else if (selectedOption == 1){
+        selectCity();
+      }
+    }
+  }
+}
+
+/**
+ * Not finished.
+ */
+void selectCity(){
+  tft.fillScreen(TFT_BLACK);
+  int min = 0;
+  int max = 1;
+  tft.setTextSize(1);
+  tft.drawString("Select City", 10, 10);
+  tft.setTextColor(TFT_BLACK, TFT_WHITE);
+  tft.fillRect(250, 0, 70, 25, TFT_WHITE);
+  tft.drawString("Select", 260, 10);
+  tft.fillRect(250, 145, 70, 25, TFT_WHITE);
+  tft.drawString("Down", 260, 155);
 }
 
 
