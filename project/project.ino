@@ -11,12 +11,15 @@
 #include <TFT_eSPI.h>
 #include <time.h>
 
+// Forecast temp for Karlskrona
+const char* apiURL = "https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/15.6885/lat/56.199/data.json";
+
 void menu();
 void settings();
 
 // Remember to remove these before commiting in GitHub
-String ssid = "ssid";
-String password = "password";
+String ssid = "-";
+String password = "-";
 
 // "tft" is the graphics libary, which has functions to draw on the screen
 TFT_eSPI tft = TFT_eSPI();
@@ -65,12 +68,16 @@ void setup() {
   // Add your code bellow 
 
 }
-
+String temperatureLabels[24];
+int scrollIndex = 0;
+const int entriesPerPage = 6;
 /**
  * This is the main loop function that runs continuously after setup.
  * Add your code here to perform tasks repeatedly.
  */
 void loop() {
+  StaticJsonDocument<64> filter;
+  filter["list"][0]["t"] = true;
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
@@ -85,20 +92,45 @@ void loop() {
  * Starting Menu
  */
 void menu() {
-  bool menu = true;
+  scrollIndex = 0;
+  bool menuActive = true;
+
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.drawString("Start Screen", 10, 10);
+
+  // Buttons
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.fillRect(250, 0, 70, 25, TFT_WHITE);
   tft.drawString("Settings", 260, 10);
-  delay(500);
-  while(menu){
-    int sensorVal = digitalRead(PIN_BUTTON_2);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    if (sensorVal == 0){
+  tft.fillRect(250, 145, 70, 25, TFT_WHITE);
+  tft.drawString("Down", 260, 155);
+
+  fetchTemperature();
+  drawTemperaturePage();
+
+  delay(500);  // Initial debounce
+
+  while (menuActive) {
+    int downButton = digitalRead(PIN_BUTTON_1);
+    int settingsButton = digitalRead(PIN_BUTTON_2);
+
+    if (settingsButton == LOW) {
+      delay(200);  // Debounce
       settings(0);
-    } 
+      return;
+    }
+
+    if (downButton == LOW) {
+      scrollIndex += entriesPerPage;
+      if (scrollIndex >= 24) {
+        scrollIndex = 0;  // Loop back to start
+      }
+
+      drawTemperaturePage();
+      delay(200);  // Debounce
+    }
   }
 }
 
@@ -173,6 +205,50 @@ void selectCity(){
   tft.fillRect(250, 145, 70, 25, TFT_WHITE);
   tft.drawString("Down", 260, 155);
 }
+
+//Retrives temeperature and time data for a location
+void fetchTemperature() {
+  HTTPClient http;
+  http.useHTTP10(true);
+  http.begin(apiURL);
+  http.GET();
+  JsonDocument doc;
+  deserializeJson(doc, http.getStream());
+  JsonArray timeSeries = doc["timeSeries"];
+  if (!timeSeries.isNull() && timeSeries.size() > 0) {
+    for (int i = 0; i < 24 && i < timeSeries.size(); i++) {
+      JsonObject ts = timeSeries[i];
+      JsonArray parameters = ts["parameters"];
+      
+      for (JsonObject param : parameters) {
+        const char* name = param["name"];
+        if (strcmp(name, "t") == 0) {
+          float tempVal = param["values"][0];
+          String temperature = String(tempVal, 2);  // 2 decimal places
+          temperatureLabels[i] = String(i) + "h: " + temperature + "C";
+          break;
+        }
+      }
+    }
+  } else {
+    Serial.println("No timeSeries data available.");
+  }
+  http.end();
+}
+
+void drawTemperaturePage() {
+  tft.fillRect(0, 40, 240, 130, TFT_BLACK);  // Clear display area
+  tft.setTextSize(2);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  for (int i = 0; i < entriesPerPage; i++) {
+    int idx = scrollIndex + i;
+    if (idx < 24) {
+      tft.drawString(temperatureLabels[idx], 10, 40 + i * 20);
+    }
+  }
+}
+  
 
 
 // TFT Pin check
