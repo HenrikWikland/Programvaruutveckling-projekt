@@ -52,8 +52,8 @@ String buildHistoricUrl();
 void selectCity(int index);
 void drawSymbols(int symbolType, int x, int y);
 // Remember to remove these before commiting in GitHub
-String ssid = "Asus";
-String password = "Wasabi10";
+String ssid = "-";
+String password = "-";
 
 // "tft" is the graphics libary, which has functions to draw on the screen
 TFT_eSPI tft = TFT_eSPI();
