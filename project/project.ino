@@ -16,8 +16,6 @@
 
 
 
-// Forecast temp for Karlskrona
-//const String apiURL = "https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/15.6885/lat/56.199/data.json";
 
 volatile bool menuRequested = false;
 bool skipIntro = false;  
@@ -41,15 +39,15 @@ int numWeatherParameters = sizeof(weatherParameters) / sizeof(weatherParameters[
 int previouslySelectedWeatherParameter = -1;  
 
 
-const int DEFAULT_CITY_INDEX = 0;
-const int DEFAULT_SELECTED_PARAMETER = 0;
+int DEFAULT_CITY_INDEX = 0;
+int DEFAULT_SELECTED_PARAMETER = 0;
 
 int cityIndex = 0;
 void menu();
 void settings();
 String buildApiURL();
 String buildHistoricUrl();
-void selectCity(int index);
+void selectCity(int index, bool reset);
 void drawSymbols(int symbolType, int x, int y);
 // Remember to remove these before commiting in GitHub
 String ssid = "-";
@@ -62,6 +60,11 @@ TFT_eSPI tft = TFT_eSPI();
 #define DISPLAY_WIDTH 320
 #define DISPLAY_HEIGHT 170
 
+#define MIN_LON 10.0
+#define MAX_LON 25.0
+#define MIN_LAT 55.0
+#define MAX_LAT 70.0
+
 WiFiClient wifi_client;
 
 void saveSettings() {
@@ -70,9 +73,19 @@ void saveSettings() {
   EEPROM.commit();
 }
 
+void saveResetSettings() {
+  EEPROM.write(0, cityIndex);                   // Save at address 0
+  EEPROM.write(1, selectedWeatherParameter);    // Save at address 1
+  EEPROM.write(2, DEFAULT_CITY_INDEX);
+  EEPROM.write(3, DEFAULT_SELECTED_PARAMETER);
+  EEPROM.commit();
+}
+
 void loadSettings() {
   cityIndex = EEPROM.read(0);
   selectedWeatherParameter = EEPROM.read(1);
+  DEFAULT_CITY_INDEX = EEPROM.read(2);
+  DEFAULT_SELECTED_PARAMETER = EEPROM.read(3);
 }
 
 /**
@@ -162,8 +175,7 @@ void menu() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString("Start Screen", 10, 10);
-
+  tft.drawString("Weather forecast, " + cities[cityIndex], 10, 10);
   // Buttons
   tft.setTextColor(TFT_BLACK, TFT_WHITE);
   tft.fillRect(250, 0, 70, 25, TFT_WHITE);
@@ -216,13 +228,14 @@ void resetSettingsToDefault() {
 void settings(int selectedOption) {
   tft.fillScreen(TFT_BLACK);
   int min = 0;
-  int max = 4;  // Now 5 options (Exit, Select City, Historic Data, Select Parameter, Reset)
+  int max = 5;  // Now 5 options (Exit, Select City, Historic Data, Select Parameter, Reset)
   String options[max + 1] = {
     "Exit Settings",
     "Select City",
     "Historic Data",
     "Select Parameter",
-    "Reset Settings"
+    "Reset Settings",
+    "Reset Preferences"
   };
 
   tft.setTextSize(1);
@@ -271,10 +284,11 @@ void settings(int selectedOption) {
     } else if (selectButton == LOW) {
       switch (selectedOption) {
         case 0: menu(); return;
-        case 1: selectCity(0); break;
+        case 1: selectCity(0, false); break;
         case 2: viewHistoricData(); break;
-        case 3: selectWeatherParameter(selectedWeatherParameter); break;
+        case 3: selectWeatherParameter(selectedWeatherParameter, false); break;
         case 4: resetSettingsToDefault(); settings(0); break;
+        case 5: selectResetOption(0); break;
         break;
       }
     }
@@ -287,7 +301,7 @@ void settings(int selectedOption) {
 /**
  * Not finished.
  */
-void selectCity(int index) {
+void selectCity(int index, bool reset) {
   tft.fillScreen(TFT_BLACK);
   int min = 0;
   int max = 4; // Assuming there are 5 cities in total
@@ -345,16 +359,29 @@ void selectCity(int index) {
       }
       // Redraw the city selection screen
       tft.fillScreen(TFT_BLACK);  // Clear previous screen
-      selectCity(index);  // Redraw with updated index
+      selectCity(index, reset);  // Redraw with updated index
       return;  // Exit the loop to re-render the city selection
     } else if (selectButton == LOW) {  // When SELECT button is pressed
       cityIndex = index;
       saveSettings();  // Save the selected city
+      if (reset){
+        return;
+      }
       menu();  // Exit and return to the menu
       return;
     }
   }
 }
+
+void selectResetOption(int selectedOption){
+  selectCity(0, true);
+  selectWeatherParameter(0, true);
+  DEFAULT_CITY_INDEX = cityIndex;
+  DEFAULT_SELECTED_PARAMETER = selectedWeatherParameter;
+  saveResetSettings();
+  settings(0);
+}
+
 
 //Retrives temeperature and time data for a location
 void fetchTemperature() {
@@ -695,7 +722,7 @@ void viewHistoricData() {
     }
   }
 }
-void selectWeatherParameter(int selectedIndex) {
+void selectWeatherParameter(int selectedIndex, bool reset) {
   int min = 0;
   int max = numWeatherParameters - 1;
 
@@ -740,7 +767,9 @@ void selectWeatherParameter(int selectedIndex) {
         // Ensure the global selectedWeatherParameter is updated before moving to settings
         selectedWeatherParameter = selectedIndex;
         saveSettings();  // Save any new settings
-
+        if (reset){
+          return;
+        }
         // Call settings() which likely transitions to another view (like the main menu)
         settings(0);
         return;
@@ -772,6 +801,7 @@ String buildApiURL() {
   + latitudes[cityIndex]
   + "/data.json";
 }
+
 
 // TFT Pin check
   //////////////////
